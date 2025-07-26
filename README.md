@@ -6,7 +6,7 @@ This is a Tuition Management application. It's main purpose is to:
  - Show Timetable for specific students.
  - Show logs of every session taken with details since begginning of year as well as summary.
  
-# Upcoming Features
+## Upcoming Features
  - Notification center: notifiy when timetable change (matching student requirement ofcoarse), session start/end, HW posted
  - Re-schedule / cancel / add sessions!
 
