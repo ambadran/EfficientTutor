@@ -186,7 +186,6 @@
 
         // --- CONFIGURATION ---
         const config = {
-            // *** FIX: Updated backendUrl to use your live, secure Render URL ***
             backendUrl: 'https://personal-time-manager.onrender.com',
             subjects: ['Math', 'Physics', 'Chemistry', 'Biology', 'IT'],
             colors: {
@@ -222,37 +221,42 @@
 
         // --- AUTHENTICATION ---
         onAuthStateChanged(auth, async user => {
-            if (user) {
-                appState.currentUser = user;
-                document.getElementById('user-info').classList.remove('hidden');
-                document.getElementById('logout-button').classList.remove('hidden');
-                document.getElementById('user-email').textContent = user.email || 'Anonymous';
-                
-                const userProfileRef = doc(db, `artifacts/${appId}/users/${user.uid}/metadata`, 'profile');
-                const userProfileSnap = await getDoc(userProfileRef);
+            try {
+                if (user) {
+                    appState.currentUser = user;
+                    document.getElementById('user-info').classList.remove('hidden');
+                    document.getElementById('logout-button').classList.remove('hidden');
+                    document.getElementById('user-email').textContent = user.email || 'Anonymous';
+                    
+                    const userProfileRef = doc(db, `artifacts/${appId}/users/${user.uid}/metadata`, 'profile');
+                    const userProfileSnap = await getDoc(userProfileRef);
 
-                if (!userProfileSnap.exists()) {
-                    await setDoc(userProfileRef, { createdAt: new Date(), isFirstSignIn: true });
-                    appState.isFirstSignIn = true;
-                    navigateTo('student-info');
-                } else {
-                    appState.isFirstSignIn = userProfileSnap.data().isFirstSignIn || false;
-                    if(appState.isFirstSignIn && appState.students.length === 0) {
+                    if (!userProfileSnap.exists()) {
+                        await setDoc(userProfileRef, { createdAt: new Date(), isFirstSignIn: true });
+                        appState.isFirstSignIn = true;
                         navigateTo('student-info');
                     } else {
-                        navigateTo('timetable');
+                        appState.isFirstSignIn = userProfileSnap.data().isFirstSignIn || false;
+                        if(appState.isFirstSignIn && appState.students.length === 0) {
+                            navigateTo('student-info');
+                        } else {
+                            navigateTo('timetable');
+                        }
                     }
-                }
-                listenToStudents();
+                    listenToStudents();
 
-            } else {
-                appState.currentUser = null;
-                appState.students = [];
-                appState.currentStudent = null;
-                if(studentDataUnsubscribe) studentDataUnsubscribe();
-                document.getElementById('user-info').classList.add('hidden');
-                document.getElementById('logout-button').classList.add('hidden');
-                navigateTo('login');
+                } else {
+                    appState.currentUser = null;
+                    appState.students = [];
+                    appState.currentStudent = null;
+                    if(studentDataUnsubscribe) studentDataUnsubscribe();
+                    document.getElementById('user-info').classList.add('hidden');
+                    document.getElementById('logout-button').classList.add('hidden');
+                    navigateTo('login');
+                }
+            } catch (error) {
+                console.error("Authentication state change error:", error);
+                displayGlobalError("An error occurred during authentication. Please refresh the page.");
             }
         });
 
@@ -293,7 +297,7 @@
                 }
             } catch (error) {
                 console.error("Failed to render page:", error);
-                pageContent.innerHTML = `<div class="text-center text-red-400 p-8">Error loading page. Please check the connection to the backend.</div>`;
+                displayGlobalError(`Error loading page: ${error.message}`);
             }
         }
         
@@ -751,7 +755,7 @@
             return `<div class="max-w-2xl mx-auto space-y-6"><div class="bg-gray-800 p-6 rounded-lg"><h3 class="text-lg font-semibold mb-4">Appearance</h3><div class="flex items-center justify-between"><span>Theme</span><button id="theme-toggle-btn" class="px-4 py-2 rounded-md font-semibold ${isDark ? 'bg-gray-700' : 'bg-gray-300 text-gray-800'}">${isDark ? '<i class="fas fa-moon mr-2"></i>Dark' : '<i class="fas fa-sun mr-2"></i>Light'}</button></div></div><div class="bg-gray-800 p-6 rounded-lg"><h3 class="text-lg font-semibold mb-4">About</h3><p class="text-gray-400">EfficientTutor v1.0.0</p></div></div>`;
         }
 
-        // --- MODAL UTILITIES ---
+        // --- MODAL & ERROR UTILITIES ---
         function showModal(title, bodyHTML, footerHTML, onAfterRender) {
             closeModal();
             const modalContainer = document.getElementById('modal-container');
@@ -765,17 +769,43 @@
         function showInfoModal(title, bodyHTML) { showModal(title, bodyHTML, `<div class="flex justify-end"><button id="modal-close-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">OK</button></div>`); }
         function closeModal(modal = null) { (modal || document.getElementById('modal-backdrop'))?.remove(); }
         function toggleSidebar() { appState.isSidebarOpen = !appState.isSidebarOpen; document.getElementById('sidebar').classList.toggle('open'); }
+        
+        function displayGlobalError(message) {
+            pageTitle.textContent = "Error";
+            pageContent.innerHTML = `<div class="text-center p-8 bg-gray-800 rounded-lg">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                <h3 class="text-xl font-semibold text-red-400">Application Error</h3>
+                <p class="text-gray-400 mt-2">${message}</p>
+                <p class="text-xs text-gray-500 mt-4">This could be a temporary issue with the backend server or your network connection. Please try refreshing the page.</p>
+            </div>`;
+        }
 
         // --- INITIALIZATION ---
-        (async () => {
+        async function initialize() {
+            // Render login page immediately so the screen is never blank
+            navigateTo('login');
+            
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-                else if (!auth.currentUser) console.log("No initial token, user needs to log in.");
+                // Health check the backend
+                const response = await fetch(config.backendUrl);
+                if (!response.ok) {
+                    throw new Error(`Backend is not responding. Status: ${response.status}`);
+                }
+                console.log("Backend connection successful.");
+
+                // Initialize Firebase Auth
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else if (!auth.currentUser) {
+                    console.log("No initial token, user needs to log in.");
+                }
             } catch (error) {
-                console.error("Auth Error:", error);
-                if (!auth.currentUser) await signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed:", err));
+                console.error("Initialization Error:", error);
+                displayGlobalError(error.message);
             }
-        })();
+        }
+
+        initialize();
     </script>
 </body>
 </html>
