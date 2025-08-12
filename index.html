@@ -560,23 +560,50 @@
             const startTime = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
             const body = `<div class="space-y-4"><div><label class="text-sm text-gray-400">Activity Type</label><select id="add-event-type" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"><option value="sports">Sports Activity</option><option value="others">Others</option></select></div><div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-400">Start Time</label><input type="time" id="add-event-start" value="${startTime}" step="900" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div><div><label class="text-sm text-gray-400">End Time</label><input type="time" id="add-event-end" value="${startTime}" step="900" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div></div></div>`;
             const footer = `<div class="flex justify-end space-x-4"><button id="modal-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Cancel</button><button id="modal-confirm-add-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">Add</button></div>`;
-            showModal('Add Activity', body, footer, (modal) => {
-                modal.addEventListener('click', e => {
-                    if (e.target.closest('#modal-cancel-btn')) closeModal(modal);
+            showDialog('Add Activity', body, footer, (dialog) => {
+                dialog.addEventListener('click', e => {
+                    if (e.target.closest('#modal-cancel-btn')) closeDialog(dialog);
                     if (e.target.closest('#modal-confirm-add-btn')) {
-                        const type = modal.querySelector('#add-event-type').value;
-                        const start = modal.querySelector('#add-event-start').value;
-                        const end = modal.querySelector('#add-event-end').value;
+                        const type = dialog.querySelector('#add-event-type').value;
+                        const start = dialog.querySelector('#add-event-start').value;
+                        const end = dialog.querySelector('#add-event-end').value;
                         if (start && end && start < end) {
                             dataSource.availability[dayKey].push({type, start, end});
                             onUpdate();
-                            closeModal(modal);
+                            closeDialog(dialog);
                         } else { alert('End time must be after start time.'); }
                     }
                 });
             });
         }
-        function showEditEventModal(dataSource, dayKey, startTime, onUpdate) { /* ... implementation unchanged ... */ }
+        function showEditEventModal(dataSource, dayKey, startTime, onUpdate) {
+            const eventList = dataSource.availability[dayKey];
+            const eventIndex = eventList.findIndex(e => e.start === startTime);
+            if (eventIndex === -1) return;
+            const event = eventList[eventIndex];
+            const body = `<div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-400">Start Time</label><input type="time" id="edit-event-start" value="${event.start}" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div><div><label class="text-sm text-gray-400">End Time</label><input type="time" id="edit-event-end" value="${event.end}" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div></div><button id="delete-event-btn" class="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">Delete Event</button>`;
+            const footer = `<div class="flex justify-end space-x-4"><button id="modal-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Cancel</button><button id="modal-confirm-edit-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">Save Changes</button></div>`;
+            showDialog(`Edit ${event.type} Activity`, body, footer, (dialog) => {
+                dialog.addEventListener('click', e => {
+                    const target = e.target.closest('button');
+                    if (!target) return;
+                    if (target.id === 'modal-cancel-btn') closeDialog(dialog);
+                    else if (target.id === 'modal-confirm-edit-btn') {
+                        const newStart = dialog.querySelector('#edit-event-start').value;
+                        const newEnd = dialog.querySelector('#edit-event-end').value;
+                        if (newStart && newEnd && newStart < newEnd) {
+                            eventList[eventIndex] = { ...event, start: newStart, end: newEnd };
+                            onUpdate();
+                            closeDialog(dialog);
+                        } else { alert('End time must be after start time.'); }
+                    } else if (target.id === 'delete-event-btn') {
+                        eventList.splice(eventIndex, 1);
+                        onUpdate();
+                        closeDialog(dialog);
+                    }
+                });
+            });
+        }
         
         // --- LOGS & SETTINGS TEMPLATES ---
         async function renderLogsPage() {
@@ -609,8 +636,19 @@
             modalContainer.appendChild(modal);
             if (onAfterRender) onAfterRender(modal);
         }
+        function showDialog(title, bodyHTML, footerHTML, onAfterRender) {
+            const modalContainer = document.getElementById('modal-container');
+            const dialog = document.createElement('div');
+            dialog.className = 'modal-backdrop';
+            dialog.style.zIndex = '110';
+            dialog.innerHTML = `<div class="modal-content"><div class="modal-header flex justify-between items-center mb-4"><h3 class="text-xl font-semibold">${title}</h3><button class="dialog-close-btn p-2 rounded-full hover:bg-gray-700 -mr-2 -mt-2"><i class="fas fa-times"></i></button></div><div class="modal-body">${bodyHTML}</div><div class="modal-footer mt-4">${footerHTML}</div></div>`;
+            dialog.querySelector('.dialog-close-btn').addEventListener('click', () => closeDialog(dialog));
+            modalContainer.appendChild(dialog);
+            if (onAfterRender) onAfterRender(dialog);
+        }
         function showInfoModal(title, bodyHTML) { showModal(title, bodyHTML, `<div class="flex justify-end"><button id="modal-close-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">OK</button></div>`); }
-        function closeModal(modal = null) { (modal || document.getElementById('modal-backdrop'))?.remove(); }
+        function closeModal() { document.getElementById('modal-backdrop')?.remove(); }
+        function closeDialog(dialog) { if (dialog) dialog.remove(); }
         function toggleSidebar() { appState.isSidebarOpen = !appState.isSidebarOpen; document.getElementById('sidebar').classList.toggle('open'); }
         
         function displayGlobalError(message) {
