@@ -34,108 +34,21 @@
             color: var(--text-color);
             overscroll-behavior: none;
         }
-        .app-container {
-            display: flex;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-        }
-        .sidebar {
-            width: 250px;
-            background-color: var(--surface-color);
-            border-right: 1px solid var(--border-color);
-            transition: transform 0.3s ease-in-out;
-            transform: translateX(-100%);
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100%;
-            z-index: 50;
-        }
-        .sidebar.open {
-            transform: translateX(0);
-        }
-        .main-content {
-            flex-grow: 1;
-            transition: margin-left 0.3s ease-in-out;
-            height: 100vh;
-            overflow-y: auto;
-        }
-        .timetable-grid {
-            position: relative;
-            height: calc(21 * 60px); /* 6 AM to 2 AM next day */
-        }
-        .time-label {
-            height: 60px;
-        }
-        .event-bubble {
-            position: absolute;
-            left: 0;
-            right: 0;
-            margin: 0 4px;
-            padding: 4px 8px;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            overflow: hidden;
-            border: 1px solid rgba(0,0,0,0.2);
-            color: #111827;
-        }
-        .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0,0,0,0.7);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
-        .modal-content {
-            background-color: var(--surface-color);
-            padding: 1.5rem;
-            border-radius: 1rem;
-            width: 100%;
-            max-width: 500px;
-            display: flex;
-            flex-direction: column;
-            max-height: 90vh;
-        }
-        .modal-header, .modal-footer {
-            flex-shrink: 0;
-        }
-        .modal-body {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding-right: 0.5rem;
-            margin-right: -0.5rem;
-            padding-bottom: 1rem;
-        }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #4f46e5;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @media (min-width: 768px) {
-            .sidebar {
-                position: static;
-                transform: translateX(0);
-            }
-            .main-content {
-                margin-left: 0;
-            }
-            #menu-button { display: none; }
-        }
+        .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+        .sidebar { width: 250px; background-color: var(--surface-color); border-right: 1px solid var(--border-color); transition: transform 0.3s ease-in-out; transform: translateX(-100%); position: fixed; top: 0; left: 0; height: 100%; z-index: 50; }
+        .sidebar.open { transform: translateX(0); }
+        .main-content { flex-grow: 1; transition: margin-left 0.3s ease-in-out; height: 100vh; overflow-y: auto; }
+        .timetable-grid { position: relative; height: calc(21 * 60px); }
+        .time-label { height: 60px; }
+        .event-bubble { position: absolute; left: 0; right: 0; margin: 0 4px; padding: 4px 8px; border-radius: 8px; font-size: 0.8rem; overflow: hidden; border: 1px solid rgba(0,0,0,0.2); color: #111827; }
+        .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .modal-content { background-color: var(--surface-color); padding: 1.5rem; border-radius: 1rem; width: 100%; max-width: 500px; display: flex; flex-direction: column; max-height: 90vh; }
+        .modal-header, .modal-footer { flex-shrink: 0; }
+        .modal-body { flex-grow: 1; overflow-y: auto; padding-right: 0.5rem; margin-right: -0.5rem; padding-bottom: 1rem; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #status-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.8); z-index: 200; display: flex; align-items: center; justify-content: center; text-align: center; color: white; flex-direction: column; gap: 1rem; }
+        @media (min-width: 768px) { .sidebar { position: static; transform: translateX(0); } .main-content { margin-left: 0; } #menu-button { display: none; } }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
@@ -175,8 +88,9 @@
         </main>
     </div>
 
-    <!-- Modals will be appended here -->
+    <!-- Modals and Overlays will be appended here -->
     <div id="modal-container"></div>
+    <div id="status-overlay-container"></div>
 
     <script type="module">
         // --- CONFIGURATION ---
@@ -225,6 +139,7 @@
         }
 
         async function handleLogin(email, password) {
+            showLoadingOverlay('Logging in...');
             try {
                 const response = await fetch(`${config.backendUrl}/login`, {
                     method: 'POST',
@@ -237,11 +152,14 @@
                 localStorage.setItem('efficientTutorUser', JSON.stringify(data.user));
                 await checkAuthState();
             } catch (error) {
-                showInfoModal('Error', `<p class="text-red-400">${error.message}</p>`);
+                showStatusMessage('error', error.message);
+            } finally {
+                hideStatusOverlay();
             }
         }
 
         async function handleSignup(email, password) {
+            showLoadingOverlay('Signing up...');
             try {
                 const response = await fetch(`${config.backendUrl}/signup`, {
                     method: 'POST',
@@ -254,7 +172,9 @@
                 localStorage.setItem('efficientTutorUser', JSON.stringify(data.user));
                 await checkAuthState();
             } catch (error) {
-                showInfoModal('Error', `<p class="text-red-400">${error.message}</p>`);
+                showStatusMessage('error', error.message);
+            } finally {
+                hideStatusOverlay();
             }
         }
 
@@ -282,26 +202,11 @@
             pageContent.innerHTML = `<div class="flex justify-center items-center h-full"><div class="loader"></div></div>`;
             try {
                 switch(appState.currentPage) {
-                    case 'login':
-                        pageTitle.textContent = 'Login / Sign Up';
-                        pageContent.innerHTML = renderLoginPage();
-                        break;
-                    case 'timetable':
-                        pageTitle.textContent = 'Timetable';
-                        pageContent.innerHTML = await renderTimetablePage();
-                        break;
-                    case 'logs':
-                        pageTitle.textContent = 'Logs';
-                        pageContent.innerHTML = await renderLogsPage();
-                        break;
-                    case 'student-info':
-                        pageTitle.textContent = 'Student Info';
-                        pageContent.innerHTML = renderStudentInfoPage();
-                        break;
-                    case 'settings':
-                        pageTitle.textContent = 'Settings';
-                        pageContent.innerHTML = renderSettingsPage();
-                        break;
+                    case 'login': pageTitle.textContent = 'Login / Sign Up'; pageContent.innerHTML = renderLoginPage(); break;
+                    case 'timetable': pageTitle.textContent = 'Timetable'; pageContent.innerHTML = await renderTimetablePage(); break;
+                    case 'logs': pageTitle.textContent = 'Logs'; pageContent.innerHTML = await renderLogsPage(); break;
+                    case 'student-info': pageTitle.textContent = 'Student Info'; pageContent.innerHTML = renderStudentInfoPage(); break;
+                    case 'settings': pageTitle.textContent = 'Settings'; pageContent.innerHTML = renderSettingsPage(); break;
                 }
             } catch (error) {
                 console.error("Failed to render page:", error);
@@ -314,42 +219,21 @@
             const target = e.target;
             const closest = (selector) => target.closest(selector);
 
-            if (closest('#login-btn')) {
-                e.preventDefault();
-                handleLogin(document.getElementById('email').value, document.getElementById('password').value);
-            }
-            if (closest('#signup-btn')) {
-                e.preventDefault();
-                handleSignup(document.getElementById('email').value, document.getElementById('password').value);
-            }
+            if (closest('#login-btn')) { e.preventDefault(); handleLogin(document.getElementById('email').value, document.getElementById('password').value); }
+            if (closest('#signup-btn')) { e.preventDefault(); handleSignup(document.getElementById('email').value, document.getElementById('password').value); }
             if (closest('#logout-button')) handleLogout();
 
             const navLink = closest('.nav-link');
-            if (navLink) {
-                e.preventDefault();
-                navigateTo(navLink.id.replace('nav-', ''));
-            }
+            if (navLink) { e.preventDefault(); navigateTo(navLink.id.replace('nav-', '')); }
             if (closest('#menu-button')) toggleSidebar();
             if (closest('#add-new-student-btn')) showStudentRegistrationWizard();
 
             const editStudentBtn = closest('.edit-student-btn');
-            if (editStudentBtn) {
-                const student = appState.students.find(s => s.id === editStudentBtn.dataset.id);
-                if (student) showStudentRegistrationWizard(student);
-            }
+            if (editStudentBtn) { const student = appState.students.find(s => s.id === editStudentBtn.dataset.id); if (student) showStudentRegistrationWizard(student); }
             const deleteStudentBtn = closest('.delete-student-btn');
-            if (deleteStudentBtn) {
-                const student = appState.students.find(s => s.id === deleteStudentBtn.dataset.id);
-                if (student) confirmDeleteStudent(student);
-            }
-            if (closest('#theme-toggle-btn')) {
-                document.documentElement.classList.toggle('dark');
-                document.documentElement.classList.toggle('light');
-                renderPage();
-            }
-            if (closest('#modal-close-btn') || (closest('#modal-backdrop') && !closest('.modal-content'))) {
-                closeModal();
-            }
+            if (deleteStudentBtn) { const student = appState.students.find(s => s.id === deleteStudentBtn.dataset.id); if (student) confirmDeleteStudent(student); }
+            if (closest('#theme-toggle-btn')) { document.documentElement.classList.toggle('dark'); document.documentElement.classList.toggle('light'); renderPage(); }
+            if (closest('#modal-close-btn') || (closest('#modal-backdrop') && !closest('.modal-content'))) { closeModal(); }
             
             const mainTimetable = closest('#page-content .timetable-component');
             if (mainTimetable) {
@@ -380,10 +264,7 @@
             const footer = `<div class="flex justify-end space-x-4"><button id="modal-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Cancel</button><button id="modal-confirm-delete-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-6 rounded-md">Delete</button></div>`;
             showModal('Confirm Deletion', `<p>Are you sure you want to delete ${student.basicInfo.firstName}?</p>`, footer, (modal) => {
                 modal.addEventListener('click', (e) => {
-                    if (e.target.closest('#modal-confirm-delete-btn')) {
-                        deleteStudent(student.id);
-                        closeModal();
-                    }
+                    if (e.target.closest('#modal-confirm-delete-btn')) { deleteStudent(student.id); closeModal(); }
                     if (e.target.closest('#modal-cancel-btn')) closeModal();
                 });
             });
@@ -399,7 +280,6 @@
                     if (day !== 'Saturday' && day !== 'Friday') registrationData.availability[day.toLowerCase()].push({ type: 'school', ...config.defaultSchoolTimes });
                 });
             }
-            
             const renderCurrentStep = () => {
                 let bodyContent = '', footerContent = '';
                 switch(step) {
@@ -410,13 +290,11 @@
                 }
                 showModal(`Student Registration - Step ${step} of 4`, bodyContent, footerContent, (modal) => attachWizardListeners(modal, registrationData));
             };
-            
             const attachWizardListeners = (modal, data) => {
                 modal.addEventListener('click', async (e) => {
-                    const target = e.target;
-                    const closest = (selector) => target.closest(selector);
+                    const target = e.target; const closest = (selector) => target.closest(selector);
                     if (closest('#wizard-next-btn')) { if (validateStep(step, data, modal)) { step++; renderCurrentStep(); } }
-                    else if (closest('#wizard-finish-btn')) { await saveStudent(data); closeModal(); }
+                    else if (closest('#wizard-finish-btn')) { await saveStudent(data); }
                     if (step === 2) {
                         if (closest('#add-subject-btn')) {
                             const name = modal.querySelector('#subject-select').value;
@@ -429,12 +307,7 @@
                     if (step === 3) {
                         const dayNavBtn = closest('.day-nav-btn');
                         if (dayNavBtn) { appState.currentTimetableDay = (appState.currentTimetableDay + parseInt(dayNavBtn.dataset.direction) + 7) % 7; renderCurrentStep(); }
-                        
-                        const updateWizardTimetable = () => {
-                            const container = modal.querySelector('#wizard-timetable-container');
-                            if (container) container.innerHTML = renderTimetableComponent(true, data);
-                        };
-
+                        const updateWizardTimetable = () => { const container = modal.querySelector('#wizard-timetable-container'); if (container) container.innerHTML = renderTimetableComponent(true, data); };
                         const grid = closest('#timetable-grid-main');
                         if(grid && e.target === grid) { showAddEventModal(data, grid.dataset.dayKey, e.offsetY, updateWizardTimetable); }
                         const bubble = closest('.event-bubble');
@@ -445,23 +318,10 @@
             renderCurrentStep();
         }
         function wizardStep1(data) { return `<div class="space-y-4"><input type="text" id="firstName" placeholder="First Name" value="${data.basicInfo.firstName}" required class="w-full p-3 bg-gray-700 rounded-md border border-gray-600"><input type="text" id="lastName" placeholder="Last Name" value="${data.basicInfo.lastName}" required class="w-full p-3 bg-gray-700 rounded-md border border-gray-600"><input type="text" id="grade" placeholder="Grade (e.g., 10)" value="${data.basicInfo.grade}" required class="w-full p-3 bg-gray-700 rounded-md border border-gray-600"></div>`; }
-        function wizardStep2(data) {
-            const subjectOptions = config.subjects.map(s => `<option value="${s}">${s}</option>`).join('');
-            const registeredSubjectsHTML = data.subjects.map((s, index) => `<div class="bg-gray-700 p-2 rounded-md flex justify-between items-center"><span>${s.name} - ${s.lessonsPerWeek} lessons/week</span><button class="remove-subject-btn text-red-400 hover:text-red-300" data-index="${index}"><i class="fas fa-times-circle"></i></button></div>`).join('');
-            return `<div id="registered-subjects-list" class="space-y-2 mb-4">${registeredSubjectsHTML || '<p class="text-sm text-gray-400">No subjects added yet.</p>'}</div><div class="flex space-x-2"><select id="subject-select" class="flex-grow p-2 bg-gray-700 rounded-md border border-gray-600">${subjectOptions}</select><input type="number" id="lessons-per-week" placeholder="Lessons/wk" min="1" value="1" class="w-28 p-2 bg-gray-700 rounded-md border border-gray-600"><button id="add-subject-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-md"><i class="fas fa-plus"></i> Add</button></div>`;
-        }
+        function wizardStep2(data) { const subjectOptions = config.subjects.map(s => `<option value="${s}">${s}</option>`).join(''); const registeredSubjectsHTML = data.subjects.map((s, index) => `<div class="bg-gray-700 p-2 rounded-md flex justify-between items-center"><span>${s.name} - ${s.lessonsPerWeek} lessons/week</span><button class="remove-subject-btn text-red-400 hover:text-red-300" data-index="${index}"><i class="fas fa-times-circle"></i></button></div>`).join(''); return `<div id="registered-subjects-list" class="space-y-2 mb-4">${registeredSubjectsHTML || '<p class="text-sm text-gray-400">No subjects added yet.</p>'}</div><div class="flex space-x-2"><select id="subject-select" class="flex-grow p-2 bg-gray-700 rounded-md border border-gray-600">${subjectOptions}</select><input type="number" id="lessons-per-week" placeholder="Lessons/wk" min="1" value="1" class="w-28 p-2 bg-gray-700 rounded-md border border-gray-600"><button id="add-subject-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-md"><i class="fas fa-plus"></i> Add</button></div>`; }
         function wizardStep3(data) { return `<div id="wizard-timetable-container">${renderTimetableComponent(true, data)}</div>`; }
         function wizardStep4() { return `<div class="text-center py-8"><i class="fas fa-check-circle text-5xl text-green-500 mb-4"></i><h3 class="text-2xl font-semibold">All Set!</h3><p class="text-gray-400 mt-2">All student information has been entered. Click Finish to save.</p></div>`; }
-        function validateStep(step, data, modal) {
-            if (step === 1) {
-                const firstName = modal.querySelector('#firstName').value.trim();
-                const lastName = modal.querySelector('#lastName').value.trim();
-                const grade = modal.querySelector('#grade').value.trim();
-                if (!firstName || !lastName || !grade) { showInfoModal('Validation Error', '<p>Please fill in all fields.</p>'); return false; }
-                data.basicInfo = { firstName, lastName, grade };
-            }
-            return true;
-        }
+        function validateStep(step, data, modal) { if (step === 1) { const firstName = modal.querySelector('#firstName').value.trim(); const lastName = modal.querySelector('#lastName').value.trim(); const grade = modal.querySelector('#grade').value.trim(); if (!firstName || !lastName || !grade) { showInfoModal('Validation Error', '<p>Please fill in all fields.</p>'); return false; } data.basicInfo = { firstName, lastName, grade }; } return true; }
 
         // --- DATA & BACKEND ---
         async function loadStudents() {
@@ -471,13 +331,11 @@
                 if (!response.ok) throw new Error('Could not fetch students.');
                 appState.students = await response.json();
                 appState.currentStudent = appState.students[0] || null;
-            } catch (error) {
-                console.error("Error loading students:", error);
-                showInfoModal('Error', `<p>${error.message}</p>`);
-            }
+            } catch (error) { console.error("Error loading students:", error); showInfoModal('Error', `<p>${error.message}</p>`); }
         }
         async function saveStudent(studentData) {
             if (!appState.currentUser) return;
+            showLoadingOverlay('Saving student data...');
             try {
                 const response = await fetch(`${config.backendUrl}/students`, {
                     method: 'POST',
@@ -491,14 +349,17 @@
                     localStorage.setItem('efficientTutorUser', JSON.stringify(appState.currentUser));
                 }
                 await loadStudents();
+                closeModal();
+                showStatusMessage('success', 'Student saved successfully!');
                 navigateTo('student-info');
             } catch (error) {
                 console.error("Error saving student:", error);
-                showInfoModal('Error', `<p>${error.message}</p>`);
+                showStatusMessage('error', error.message);
             }
         }
         async function deleteStudent(studentId) {
             if (!appState.currentUser) return;
+            showLoadingOverlay('Deleting student...');
             try {
                 const response = await fetch(`${config.backendUrl}/students`, {
                     method: 'DELETE',
@@ -507,10 +368,11 @@
                 });
                 if (!response.ok) throw new Error('Could not delete student.');
                 await loadStudents();
+                showStatusMessage('success', 'Student deleted.');
                 renderPage();
             } catch (error) {
                 console.error("Error deleting student:", error);
-                showInfoModal('Error', `<p>${error.message}</p>`);
+                showStatusMessage('error', error.message);
             }
         }
         
@@ -522,25 +384,15 @@
                 if (!response.ok) throw new Error('Failed to fetch timetable.');
                 const backendTimetable = await response.json();
                 return renderTimetableComponent(false, appState.currentStudent, backendTimetable.tuitions);
-            } catch (error) {
-                console.error("Error fetching timetable:", error);
-                showInfoModal('Backend Error', `<p>${error.message}</p>`);
-                return renderTimetableComponent(false, appState.currentStudent, []);
-            }
+            } catch (error) { console.error("Error fetching timetable:", error); return renderTimetableComponent(false, appState.currentStudent, []); }
         }
         function renderTimetableComponent(isWizard, dataSource, tuitions = []) {
             const dayKey = config.daysOfWeek[appState.currentTimetableDay].toLowerCase();
             const availability = dataSource.availability ? (dataSource.availability[dayKey] || []) : [];
             const tuitionsForDay = isWizard ? [] : tuitions.filter(t => t.day === dayKey);
             let timeLabelsHTML = '';
-            for (let hour = config.timeSlotsStartHour; hour < 24 + config.timeSlotsStartHour - 1; hour++) {
-                const displayHour = hour % 24; let formattedHour = displayHour % 12; if (formattedHour === 0) formattedHour = 12;
-                timeLabelsHTML += `<div class="time-label text-right pr-2 text-xs text-gray-500 border-t border-gray-700 flex items-center justify-end">${formattedHour} ${displayHour >= 12 ? 'PM' : 'AM'}</div>`;
-            }
-            const timeToPixels = (timeStr) => {
-                if(!timeStr) return 0; const [h, m] = timeStr.split(':').map(Number);
-                return ((h * 60 + m) - (config.timeSlotsStartHour * 60)) * config.pixelsPerMinute;
-            }
+            for (let hour = config.timeSlotsStartHour; hour < 24 + config.timeSlotsStartHour - 1; hour++) { const displayHour = hour % 24; let formattedHour = displayHour % 12; if (formattedHour === 0) formattedHour = 12; timeLabelsHTML += `<div class="time-label text-right pr-2 text-xs text-gray-500 border-t border-gray-700 flex items-center justify-end">${formattedHour} ${displayHour >= 12 ? 'PM' : 'AM'}</div>`; }
+            const timeToPixels = (timeStr) => { if(!timeStr) return 0; const [h, m] = timeStr.split(':').map(Number); return ((h * 60 + m) - (config.timeSlotsStartHour * 60)) * config.pixelsPerMinute; }
             const eventBubblesHTML = [...availability, ...tuitionsForDay].map(event => {
                 if(!event.start || !event.end) return ''; const top = timeToPixels(event.start), bottom = timeToPixels(event.end), height = bottom - top; if (height <= 0) return '';
                 const isTuition = !!event.subject, type = isTuition ? 'tuition' : event.type, color = config.colors[type], text = isTuition ? event.subject : event.type;
@@ -554,53 +406,31 @@
             return `<div class="mb-4"><label for="student-selector" class="text-sm text-gray-400">Viewing Timetable for:</label><select id="student-selector" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600">${options}</select></div>`;
         }
         function showAddEventModal(dataSource, dayKey, pixelY, onUpdate) {
-            const totalMinutes = (pixelY / config.pixelsPerMinute) + (config.timeSlotsStartHour * 60);
-            const hour = Math.floor(totalMinutes / 60);
-            const minute = Math.floor(totalMinutes % 60 / 15) * 15;
-            const startTime = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+            const totalMinutes = (pixelY / config.pixelsPerMinute) + (config.timeSlotsStartHour * 60); const hour = Math.floor(totalMinutes / 60); const minute = Math.floor(totalMinutes % 60 / 15) * 15; const startTime = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
             const body = `<div class="space-y-4"><div><label class="text-sm text-gray-400">Activity Type</label><select id="add-event-type" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"><option value="sports">Sports Activity</option><option value="others">Others</option></select></div><div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-400">Start Time</label><input type="time" id="add-event-start" value="${startTime}" step="900" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div><div><label class="text-sm text-gray-400">End Time</label><input type="time" id="add-event-end" value="${startTime}" step="900" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div></div></div>`;
             const footer = `<div class="flex justify-end space-x-4"><button id="modal-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Cancel</button><button id="modal-confirm-add-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">Add</button></div>`;
             showDialog('Add Activity', body, footer, (dialog) => {
                 dialog.addEventListener('click', e => {
                     if (e.target.closest('#modal-cancel-btn')) closeDialog(dialog);
                     if (e.target.closest('#modal-confirm-add-btn')) {
-                        const type = dialog.querySelector('#add-event-type').value;
-                        const start = dialog.querySelector('#add-event-start').value;
-                        const end = dialog.querySelector('#add-event-end').value;
-                        if (start && end && start < end) {
-                            dataSource.availability[dayKey].push({type, start, end});
-                            onUpdate();
-                            closeDialog(dialog);
-                        } else { alert('End time must be after start time.'); }
+                        const type = dialog.querySelector('#add-event-type').value; const start = dialog.querySelector('#add-event-start').value; const end = dialog.querySelector('#add-event-end').value;
+                        if (start && end && start < end) { dataSource.availability[dayKey].push({type, start, end}); onUpdate(); closeDialog(dialog); } else { alert('End time must be after start time.'); }
                     }
                 });
             });
         }
         function showEditEventModal(dataSource, dayKey, startTime, onUpdate) {
-            const eventList = dataSource.availability[dayKey];
-            const eventIndex = eventList.findIndex(e => e.start === startTime);
-            if (eventIndex === -1) return;
-            const event = eventList[eventIndex];
+            const eventList = dataSource.availability[dayKey]; const eventIndex = eventList.findIndex(e => e.start === startTime); if (eventIndex === -1) return; const event = eventList[eventIndex];
             const body = `<div class="grid grid-cols-2 gap-4"><div><label class="text-sm text-gray-400">Start Time</label><input type="time" id="edit-event-start" value="${event.start}" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div><div><label class="text-sm text-gray-400">End Time</label><input type="time" id="edit-event-end" value="${event.end}" class="w-full mt-1 p-2 bg-gray-700 rounded-md border border-gray-600"></div></div><button id="delete-event-btn" class="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">Delete Event</button>`;
             const footer = `<div class="flex justify-end space-x-4"><button id="modal-cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Cancel</button><button id="modal-confirm-edit-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">Save Changes</button></div>`;
             showDialog(`Edit ${event.type} Activity`, body, footer, (dialog) => {
                 dialog.addEventListener('click', e => {
-                    const target = e.target.closest('button');
-                    if (!target) return;
+                    const target = e.target.closest('button'); if (!target) return;
                     if (target.id === 'modal-cancel-btn') closeDialog(dialog);
                     else if (target.id === 'modal-confirm-edit-btn') {
-                        const newStart = dialog.querySelector('#edit-event-start').value;
-                        const newEnd = dialog.querySelector('#edit-event-end').value;
-                        if (newStart && newEnd && newStart < newEnd) {
-                            eventList[eventIndex] = { ...event, start: newStart, end: newEnd };
-                            onUpdate();
-                            closeDialog(dialog);
-                        } else { alert('End time must be after start time.'); }
-                    } else if (target.id === 'delete-event-btn') {
-                        eventList.splice(eventIndex, 1);
-                        onUpdate();
-                        closeDialog(dialog);
-                    }
+                        const newStart = dialog.querySelector('#edit-event-start').value; const newEnd = dialog.querySelector('#edit-event-end').value;
+                        if (newStart && newEnd && newStart < newEnd) { eventList[eventIndex] = { ...event, start: newStart, end: newEnd }; onUpdate(); closeDialog(dialog); } else { alert('End time must be after start time.'); }
+                    } else if (target.id === 'delete-event-btn') { eventList.splice(eventIndex, 1); onUpdate(); closeDialog(dialog); }
                 });
             });
         }
@@ -611,61 +441,49 @@
             try {
                 const response = await fetch(`${config.backendUrl}/logs?student_id=${appState.currentStudent.id}`);
                 if (!response.ok) throw new Error('Failed to fetch logs.');
-                const logData = await response.json();
-                const { summary, detailed_logs } = logData;
+                const logData = await response.json(); const { summary, detailed_logs } = logData;
                 const logsHTML = detailed_logs.map(log => `<div class="bg-gray-800 p-4 rounded-lg grid grid-cols-3 md:grid-cols-4 gap-4 items-center"><div><p class="font-semibold">${log.subject}</p><p class="text-sm text-gray-400">${log.date}</p></div><div class="text-sm text-gray-400 text-center"><p>${log.time_start} - ${log.time_end}</p></div><div class="text-center">${log.duration}</div><div class="text-center"><span class="px-3 py-1 rounded-full text-sm font-semibold ${log.status === 'Paid' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${log.status}</span></div></div>`).join('');
                 return `<div class="space-y-6"><div><h3 class="text-xl font-semibold mb-4">Summary</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div class="bg-gray-800 p-4 rounded-lg text-center"><p class="text-3xl font-bold text-red-500">${summary.unpaid_count}</p><p class="text-gray-400">Lessons Unpaid</p></div><div class="bg-gray-800 p-4 rounded-lg text-center"><p class="text-3xl font-bold text-green-500">${summary.paid_count}</p><p class="text-gray-400">Lessons Paid</p></div><div class="bg-gray-800 p-4 rounded-lg text-center"><p class="text-3xl font-bold text-yellow-400">$${summary.total_due.toFixed(2)}</p><p class="text-gray-400">Total Amount Due</p></div></div></div><div><h3 class="text-xl font-semibold mb-4">Detailed Logs</h3><div class="space-y-2">${logsHTML}</div></div></div>`;
-            } catch (error) {
-                console.error("Error fetching logs:", error);
-                return `<div class="text-center text-red-400 p-8">Error loading logs: ${error.message}</div>`;
-            }
+            } catch (error) { console.error("Error fetching logs:", error); return `<div class="text-center text-red-400 p-8">Error loading logs: ${error.message}</div>`; }
         }
-        function renderSettingsPage() {
-            const isDark = document.documentElement.classList.contains('dark');
-            return `<div class="max-w-2xl mx-auto space-y-6"><div class="bg-gray-800 p-6 rounded-lg"><h3 class="text-lg font-semibold mb-4">Appearance</h3><div class="flex items-center justify-between"><span>Theme</span><button id="theme-toggle-btn" class="px-4 py-2 rounded-md font-semibold ${isDark ? 'bg-gray-700' : 'bg-gray-300 text-gray-800'}">${isDark ? '<i class="fas fa-moon mr-2"></i>Dark' : '<i class="fas fa-sun mr-2"></i>Light'}</button></div></div><div class="bg-gray-800 p-6 rounded-lg"><h3 class="text-lg font-semibold mb-4">About</h3><p class="text-gray-400">EfficientTutor v1.0.0</p></div></div>`;
-        }
+        function renderSettingsPage() { const isDark = document.documentElement.classList.contains('dark'); return `<div class="max-w-2xl mx-auto space-y-6"><div class="bg-gray-800 p-6 rounded-lg"><h3 class="text-lg font-semibold mb-4">Appearance</h3><div class="flex items-center justify-between"><span>Theme</span><button id="theme-toggle-btn" class="px-4 py-2 rounded-md font-semibold ${isDark ? 'bg-gray-700' : 'bg-gray-300 text-gray-800'}">${isDark ? '<i class="fas fa-moon mr-2"></i>Dark' : '<i class="fas fa-sun mr-2"></i>Light'}</button></div></div><div class="bg-gray-800 p-6 rounded-lg"><h3 class="text-lg font-semibold mb-4">About</h3><p class="text-gray-400">EfficientTutor v1.0.0</p></div></div>`; }
 
-        // --- MODAL & ERROR UTILITIES ---
-        function showModal(title, bodyHTML, footerHTML, onAfterRender) {
-            closeModal();
-            const modalContainer = document.getElementById('modal-container');
-            const modal = document.createElement('div');
-            modal.id = 'modal-backdrop';
-            modal.className = 'modal-backdrop';
-            modal.innerHTML = `<div class="modal-content"><div class="modal-header flex justify-between items-center mb-4"><h3 class="text-xl font-semibold">${title}</h3><button id="modal-close-btn" class="p-2 rounded-full hover:bg-gray-700 -mr-2 -mt-2"><i class="fas fa-times"></i></button></div><div class="modal-body">${bodyHTML}</div><div class="modal-footer mt-4">${footerHTML}</div></div>`;
-            modalContainer.appendChild(modal);
-            if (onAfterRender) onAfterRender(modal);
-        }
-        function showDialog(title, bodyHTML, footerHTML, onAfterRender) {
-            const modalContainer = document.getElementById('modal-container');
-            const dialog = document.createElement('div');
-            dialog.className = 'modal-backdrop';
-            dialog.style.zIndex = '110';
-            dialog.innerHTML = `<div class="modal-content"><div class="modal-header flex justify-between items-center mb-4"><h3 class="text-xl font-semibold">${title}</h3><button class="dialog-close-btn p-2 rounded-full hover:bg-gray-700 -mr-2 -mt-2"><i class="fas fa-times"></i></button></div><div class="modal-body">${bodyHTML}</div><div class="modal-footer mt-4">${footerHTML}</div></div>`;
-            dialog.querySelector('.dialog-close-btn').addEventListener('click', () => closeDialog(dialog));
-            modalContainer.appendChild(dialog);
-            if (onAfterRender) onAfterRender(dialog);
-        }
+        // --- MODAL & STATUS UTILITIES ---
+        function showModal(title, bodyHTML, footerHTML, onAfterRender) { closeModal(); const modalContainer = document.getElementById('modal-container'); const modal = document.createElement('div'); modal.id = 'modal-backdrop'; modal.className = 'modal-backdrop'; modal.innerHTML = `<div class="modal-content"><div class="modal-header flex justify-between items-center mb-4"><h3 class="text-xl font-semibold">${title}</h3><button id="modal-close-btn" class="p-2 rounded-full hover:bg-gray-700 -mr-2 -mt-2"><i class="fas fa-times"></i></button></div><div class="modal-body">${bodyHTML}</div><div class="modal-footer mt-4">${footerHTML}</div></div>`; modalContainer.appendChild(modal); if (onAfterRender) onAfterRender(modal); }
+        function showDialog(title, bodyHTML, footerHTML, onAfterRender) { const modalContainer = document.getElementById('modal-container'); const dialog = document.createElement('div'); dialog.className = 'modal-backdrop'; dialog.style.zIndex = '110'; dialog.innerHTML = `<div class="modal-content"><div class="modal-header flex justify-between items-center mb-4"><h3 class="text-xl font-semibold">${title}</h3><button class="dialog-close-btn p-2 rounded-full hover:bg-gray-700 -mr-2 -mt-2"><i class="fas fa-times"></i></button></div><div class="modal-body">${bodyHTML}</div><div class="modal-footer mt-4">${footerHTML}</div></div>`; dialog.querySelector('.dialog-close-btn').addEventListener('click', () => closeDialog(dialog)); modalContainer.appendChild(dialog); if (onAfterRender) onAfterRender(dialog); }
         function showInfoModal(title, bodyHTML) { showModal(title, bodyHTML, `<div class="flex justify-end"><button id="modal-close-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">OK</button></div>`); }
         function closeModal() { document.getElementById('modal-backdrop')?.remove(); }
         function closeDialog(dialog) { if (dialog) dialog.remove(); }
-        function toggleSidebar() { appState.isSidebarOpen = !appState.isSidebarOpen; document.getElementById('sidebar').classList.toggle('open'); }
         
+        const statusContainer = document.getElementById('status-overlay-container');
+        function showLoadingOverlay(message) { statusContainer.innerHTML = `<div id="status-overlay"><div class="loader"></div><p>${message}</p></div>`; }
+        function showStatusMessage(type, message) {
+            const icon = type === 'success' ? '<i class="fas fa-check-circle text-5xl text-green-500"></i>' : '<i class="fas fa-times-circle text-5xl text-red-500"></i>';
+            statusContainer.innerHTML = `<div id="status-overlay">${icon}<p>${message}</p></div>`;
+            setTimeout(hideStatusOverlay, 2000);
+        }
+        function hideStatusOverlay() { statusContainer.innerHTML = ''; }
+        
+        function toggleSidebar() { appState.isSidebarOpen = !appState.isSidebarOpen; document.getElementById('sidebar').classList.toggle('open'); }
         function displayGlobalError(message) {
             pageTitle.textContent = "Error";
-            pageContent.innerHTML = `<div class="text-center p-8 bg-gray-800 rounded-lg"><i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i><h3 class="text-xl font-semibold text-red-400">Application Error</h3><p class="text-gray-400 mt-2">${message}</p><p class="text-xs text-gray-500 mt-4">This could be a temporary issue with the backend server or your network connection. Please try refreshing the page.</p></div>`;
+            pageContent.innerHTML = `<div class="text-center p-8 bg-gray-800 rounded-lg"><i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i><h3 class="text-xl font-semibold text-red-400">Application Error</h3><p class="text-gray-400 mt-2">${message}</p><p class="text-xs text-gray-500 mt-4">This could be a temporary issue with the backend server or your network connection. Please try refreshing the page.</p><button id="retry-connection-btn" class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md">Retry Connection</button></div>`;
+            document.getElementById('retry-connection-btn').addEventListener('click', initialize);
         }
 
         // --- INITIALIZATION ---
         async function initialize() {
             navigateTo('login');
+            showLoadingOverlay('Connecting to server...');
             try {
                 const response = await fetch(config.backendUrl);
                 if (!response.ok) throw new Error(`Backend is not responding. Status: ${response.status}`);
                 console.log("Backend connection successful.");
+                hideStatusOverlay();
                 await checkAuthState();
             } catch (error) {
                 console.error("Initialization Error:", error);
+                hideStatusOverlay();
                 displayGlobalError(error.message);
             }
         }
