@@ -283,11 +283,13 @@
             let step = 1;
             let registrationData = studentToEdit ? JSON.parse(JSON.stringify(studentToEdit)) : { id: crypto.randomUUID(), basicInfo: { firstName: '', lastName: '', grade: '' }, subjects: [], availability: {} };
             if (!studentToEdit) {
+                const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
                 config.daysOfWeek.forEach(day => {
                     const dayKey = day.toLowerCase();
                     registrationData.availability[dayKey] = [];
                     registrationData.availability[dayKey].push({ type: 'sleep', ...config.defaultSleepTimes });
-                    if (day !== 'Saturday' && day !== 'Friday') {
+                    // *** FIX: Only add school times for weekdays ***
+                    if (weekdays.includes(day)) {
                         registrationData.availability[dayKey].push({ type: 'school', ...config.defaultSchoolTimes });
                     }
                 });
