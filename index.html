@@ -97,7 +97,9 @@
     <script type="module">
         // --- CONFIGURATION ---
         const config = {
-            backendUrl: 'https://personal-time-manager.onrender.com', 
+            backendUrl: window.location.hostname === '127.0.0.1' 
+                ? 'http://127.0.0.1:5000' 
+                : 'https://personal-time-manager.onrender.com',
             subjects: ['Math', 'Physics', 'Chemistry', 'Biology', 'IT'],
             colors: {
                 school: 'var(--school-color)',
