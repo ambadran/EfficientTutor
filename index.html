@@ -39,7 +39,7 @@
         .sidebar { width: 250px; background-color: var(--surface-color); border-right: 1px solid var(--border-color); transition: transform 0.3s ease-in-out; transform: translateX(-100%); position: fixed; top: 0; left: 0; height: 100%; z-index: 50; }
         .sidebar.open { transform: translateX(0); }
         .main-content { flex-grow: 1; transition: margin-left 0.3s ease-in-out; height: 100vh; overflow-y: auto; }
-        .timetable-grid { position: relative; height: calc(21 * 60px); }
+        .timetable-grid { position: relative; height: calc(24 * 60px); } /* FIX: Grid is now 24 hours tall */
         .time-label { height: 60px; }
         .event-bubble { position: absolute; left: 0; right: 0; margin: 0 4px; padding: 4px 8px; border-radius: 8px; font-size: 0.8rem; overflow: hidden; border: 1px solid rgba(0,0,0,0.2); color: #111827; }
         .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -111,7 +111,7 @@
             defaultSchoolTimes: { start: '06:00', end: '15:00' },
             defaultSleepTimes: { start: '22:00', end: '05:00' },
             daysOfWeek: ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-            timeSlotsStartHour: 6,
+            timeSlotsStartHour: 5, // FIX: Start the day at 5 AM
             pixelsPerMinute: 1,
         };
         
@@ -429,25 +429,31 @@
             const availability = dataSource.availability ? (dataSource.availability[dayKey] || []) : [];
             const tuitionsForDay = isWizard ? [] : tuitions.filter(t => t.day === dayKey);
             let timeLabelsHTML = '';
-            for (let hour = config.timeSlotsStartHour; hour < 24 + config.timeSlotsStartHour - 1; hour++) { const displayHour = hour % 24; let formattedHour = displayHour % 12; if (formattedHour === 0) formattedHour = 12; timeLabelsHTML += `<div class="time-label text-right pr-2 text-xs text-gray-500 border-t border-gray-700 flex items-center justify-end">${formattedHour} ${displayHour >= 12 ? 'PM' : 'AM'}</div>`; }
+            for (let hour = config.timeSlotsStartHour; hour < 24 + config.timeSlotsStartHour; hour++) { const displayHour = hour % 24; let formattedHour = displayHour % 12; if (formattedHour === 0) formattedHour = 12; timeLabelsHTML += `<div class="time-label text-right pr-2 text-xs text-gray-500 border-t border-gray-700 flex items-center justify-end">${formattedHour} ${displayHour >= 12 ? 'PM' : 'AM'}</div>`; }
+            
             const timeToPixels = (timeStr) => {
                 if(!timeStr) return 0; const [h, m] = timeStr.split(':').map(Number);
                 let totalMinutes = h * 60 + m;
-                if (totalMinutes < config.timeSlotsStartHour * 60) totalMinutes += 24 * 60; // Handle overnight times like sleep
+                if (h < config.timeSlotsStartHour) {
+                    totalMinutes += 24 * 60;
+                }
                 return (totalMinutes - (config.timeSlotsStartHour * 60)) * config.pixelsPerMinute;
             }
             const eventBubblesHTML = [...availability, ...tuitionsForDay].map(event => {
                 if(!event.start || !event.end) return ''; 
-                const [startH] = event.start.split(':').map(Number);
-                const [endH] = event.end.split(':').map(Number);
-                if (endH < startH) { // Overnight event like sleep
-                    const part1 = {...event, end: '23:59'}; const part2 = {...event, start: '00:00'};
-                    return createBubble(part1) + createBubble(part2);
+                const top = timeToPixels(event.start);
+                const bottom = timeToPixels(event.end);
+                if (bottom < top) { // Overnight event
+                    const endOfGridPixels = 24 * 60 * config.pixelsPerMinute;
+                    const part1Height = endOfGridPixels - top;
+                    const part2Height = bottom;
+                    return createBubble(event, top, part1Height) + createBubble(event, 0, part2Height);
                 }
-                return createBubble(event);
+                return createBubble(event, top, bottom - top);
             }).join('');
-            function createBubble(event) {
-                const top = timeToPixels(event.start); const bottom = timeToPixels(event.end); const height = bottom - top; if (height <= 0) return '';
+
+            function createBubble(event, top, height) {
+                if (height <= 0) return '';
                 const isTuition = !!event.subject, type = isTuition ? 'tuition' : event.type, color = config.colors[type], text = isTuition ? event.subject : event.type;
                 return `<div class="event-bubble ${type !== 'tuition' ? 'cursor-pointer' : ''} hover:opacity-80" style="background-color: ${color}; top: ${top}px; height: ${height}px;" data-type="${type}" data-start="${event.start}" data-end="${event.end}"><p class="font-bold capitalize">${text}</p><p>${event.start} - ${event.end}</p></div>`;
             }
@@ -468,7 +474,7 @@
                     if (e.target.closest('#modal-cancel-btn')) closeDialog(dialog);
                     if (e.target.closest('#modal-confirm-add-btn')) {
                         const type = dialog.querySelector('#add-event-type').value; const start = dialog.querySelector('#add-event-start').value; const end = dialog.querySelector('#add-event-end').value;
-                        if (start && end && start < end) { dataSource.availability[dayKey].push({type, start, end}); onUpdate(); closeDialog(dialog); } else { alert('End time must be after start time.'); }
+                        if (start && end) { dataSource.availability[dayKey].push({type, start, end}); onUpdate(); closeDialog(dialog); } else { alert('Please set start and end times.'); }
                     }
                 });
             });
