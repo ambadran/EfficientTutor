@@ -97,7 +97,7 @@
     <script type="module">
         // --- CONFIGURATION ---
         const config = {
-            backendUrl: 'https://personal-time-manager.onrender.com',
+            backendUrl: 'https://personal-time-manager.onrender.com', 
             subjects: ['Math', 'Physics', 'Chemistry', 'Biology', 'IT'],
             colors: {
                 school: 'var(--school-color)',
@@ -288,7 +288,6 @@
                     const dayKey = day.toLowerCase();
                     registrationData.availability[dayKey] = [];
                     registrationData.availability[dayKey].push({ type: 'sleep', ...config.defaultSleepTimes });
-                    // *** FIX: Only add school times for weekdays ***
                     if (weekdays.includes(day)) {
                         registrationData.availability[dayKey].push({ type: 'school', ...config.defaultSchoolTimes });
                     }
@@ -497,7 +496,10 @@
                     if (e.target.closest('#modal-confirm-set-all-btn')) {
                         const newStart = dialog.querySelector('#set-all-start').value;
                         const newEnd = dialog.querySelector('#set-all-end').value;
-                        config.daysOfWeek.forEach(day => {
+                        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+                        const daysToUpdate = type === 'school' ? weekdays : config.daysOfWeek;
+
+                        daysToUpdate.forEach(day => {
                             const dayKey = day.toLowerCase();
                             const eventIndex = dataSource.availability[dayKey].findIndex(event => event.type === type);
                             if (eventIndex > -1) {
